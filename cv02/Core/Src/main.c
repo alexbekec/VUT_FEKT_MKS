@@ -34,6 +34,8 @@
 #define LED_TIME_BLINK 300 // direktiva pre preprocesor, nahradzuje text v ramci zdrojoveho kodu a prepisuje ho na definovanú hodnotu
 #define LED_TIME_LONG 1000
 #define LED_TIME_SHORT 100
+#define BTN_PERIOD_S2 40
+#define BTN_PERIOD_S1 5
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -301,28 +303,36 @@ void blikac(void) {
 }
 
 void tlacitka(void) {
+	static uint16_t debounce = 0xFFFF;
 	static uint32_t off_time;
+	static uint32_t last_time_s2;
+	static uint32_t last_time_s1;
 
 	static uint32_t old_s2;
 	uint32_t new_s2 = LL_GPIO_IsInputPinSet(S2_GPIO_Port, S2_Pin);
 
-	if (old_s2 && !new_s2) {
-		off_time = Tick + LED_TIME_SHORT;
-		LL_GPIO_SetOutputPin(LED2_GPIO_Port, LED2_Pin);
-	}
-	old_s2 = new_s2;
-
-	static uint32_t old_s1;
-		uint32_t new_s1 = LL_GPIO_IsInputPinSet(S1_GPIO_Port, S1_Pin);
-
-	if (old_s1 && !new_s1) {
-		off_time = Tick + LED_TIME_LONG;
-		LL_GPIO_SetOutputPin(LED2_GPIO_Port, LED2_Pin);
-	}
-	old_s1 = new_s1;
-
 	if (Tick > off_time) {
 		LL_GPIO_ResetOutputPin(LED2_GPIO_Port, LED2_Pin);
+	}
+
+	if (Tick > last_time_s2 + BTN_PERIOD_S2) {
+		last_time_s2 = Tick;
+
+		if (old_s2 && !new_s2) {
+			LL_GPIO_SetOutputPin(LED2_GPIO_Port, LED2_Pin);
+			off_time = Tick + LED_TIME_SHORT;
+		}
+		old_s2 = new_s2;
+	}
+
+	if (Tick > last_time_s1 + BTN_PERIOD_S1) {
+		last_time_s1 = Tick;
+		debounce = (debounce << 1) + LL_GPIO_IsInputPinSet(S1_GPIO_Port, S1_Pin);
+
+		if (debounce == 0x7FFF) {
+			LL_GPIO_SetOutputPin(LED2_GPIO_Port, LED2_Pin);
+			off_time = Tick + LED_TIME_LONG;
+		}
 	}
 }
 /* USER CODE END 4 */
