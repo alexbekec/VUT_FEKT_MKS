@@ -95,13 +95,25 @@ void sct_value(uint16_t value, uint8_t leds, uint8_t point) {
 	};
 
 	uint32_t reg = 0;
-
+/*	if (value >= 0) {
+		reg |= reg_values[0][value / 100 % 10];
+		reg |= reg_values[1][value / 10 % 10];
+		reg |= reg_values[2][value % 10];
+		reg |= reg_values[3][leds];
+		reg |= reg_values[4][point];
+	} else {
+		reg |= 0b0000000000001000 << 16;
+		reg |= reg_values[1][value / 10 % 10];
+		reg |= reg_values[2][value % 10];
+		reg |= reg_values[3][leds];
+		reg |= reg_values[4][point];
+	}
+*/
 	reg |= reg_values[0][value / 100 % 10];
 	reg |= reg_values[1][value / 10 % 10];
 	reg |= reg_values[2][value % 10];
 	reg |= reg_values[3][leds];
 	reg |= reg_values[4][point];
-
 	sct_led(reg);
 
 }
