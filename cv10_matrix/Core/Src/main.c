@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -31,6 +31,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define TIMEOUT 5000
 
 /* USER CODE END PD */
 
@@ -40,9 +41,14 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+TIM_HandleTypeDef htim3;
+
 UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
+static volatile int8_t key = -1;
+static uint32_t timer_last = 0;
+static uint8_t password[5] = {7,9,3,2,12};
 
 /* USER CODE END PV */
 
@@ -50,13 +56,18 @@ UART_HandleTypeDef huart3;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+int __io_putchar(int ch)
+{
+	ITM_SendChar(ch);
+	return 0;
+}
 /* USER CODE END 0 */
 
 /**
@@ -88,19 +99,81 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART3_UART_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
+  HAL_TIM_Base_Start_IT(&htim3);
 
+  printf(" ****\n");
+
+  timer_last = HAL_GetTick();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
-    /* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
-	  HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin);
-	  HAL_Delay(250);
+  uint8_t position = 0;
+  uint8_t status_timer = 0;
+
+  while (1) {
+
+	  if ((status_timer == 1) && ((timer_last + TIMEOUT) < HAL_GetTick())) {
+		  printf("Timeout!\n");
+		  position = 0;
+		  status_timer = 0;
+		  continue;
+	  }
+
+	  if (key != -1) {
+		  switch (key)
+		  {
+		  case 0: printf("Key: 0\n"); break;
+		  case 1: printf("Key: 1\n"); break;
+		  case 2: printf("Key: 2\n"); break;
+		  case 3: printf("Key: 3\n"); break;
+		  case 4: printf("Key: 4\n"); break;
+		  case 5: printf("Key: 5\n"); break;
+		  case 6: printf("Key: 6\n"); break;
+		  case 7: printf("Key: 7\n"); break;
+		  case 8: printf("Key: 8\n"); break;
+		  case 9: printf("Key: 9\n"); break;
+		  case 11: printf("Key: *\n"); break;
+		  case 12: printf("Key: #\n"); break;
+		  case 21: printf("Key: A\n"); break;
+		  case 22: printf("Key: B\n"); break;
+		  case 23: printf("Key: C\n"); break;
+		  case 24: printf("Key: D\n"); break;
+		  }
+
+		  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, 0);
+
+		  if (key != -1) {
+			  status_timer = 1;
+			  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, 0);
+
+			  if (key == password[position]) {
+				  if (key == 12 && position == 4) {
+					  printf("Correct password!\n");
+					  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, 1);
+
+					  position = 0;
+					  status_timer = 0;
+				  }
+				  position++;
+			  } else {
+				  position = 0;
+				  if (key == 12) {
+					  printf("Wrong password!\n");
+				  }
+			  }
+		  }
+
+		  HAL_Delay(250);
+		  timer_last = HAL_GetTick();
+		  key = -1;
+	  }
+	  /* USER CODE END WHILE */
+
+	  /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
 }
@@ -151,6 +224,51 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 8399;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 99;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
+
+}
+
+/**
   * @brief USART3 Initialization Function
   * @param None
   * @retval None
@@ -195,24 +313,42 @@ static void MX_GPIO_Init(void)
 /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
-  __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOG_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOF, ROW3_Pin|ROW4_Pin|ROW2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, LD1_Pin|LD3_Pin|LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(USB_PowerSwitchOn_GPIO_Port, USB_PowerSwitchOn_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOG, ROW1_Pin|USB_PowerSwitchOn_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : COL1_Pin COL4_Pin COL3_Pin COL2_Pin */
+  GPIO_InitStruct.Pin = COL1_Pin|COL4_Pin|COL3_Pin|COL2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
   /*Configure GPIO pin : USER_Btn_Pin */
   GPIO_InitStruct.Pin = USER_Btn_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(USER_Btn_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : ROW3_Pin ROW4_Pin ROW2_Pin */
+  GPIO_InitStruct.Pin = ROW3_Pin|ROW4_Pin|ROW2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
 
   /*Configure GPIO pins : RMII_MDC_Pin RMII_RXD0_Pin RMII_RXD1_Pin */
   GPIO_InitStruct.Pin = RMII_MDC_Pin|RMII_RXD0_Pin|RMII_RXD1_Pin;
@@ -236,6 +372,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : ROW1_Pin */
+  GPIO_InitStruct.Pin = ROW1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(ROW1_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : RMII_TXD1_Pin */
   GPIO_InitStruct.Pin = RMII_TXD1_Pin;
@@ -285,7 +428,36 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+	static uint8_t ROW = 0;
+	static const uint8_t keyboard[4][4] = {
+		{ 1, 2, 3, 21 },
+		{ 4, 5, 6, 22 },
+		{ 7, 8, 9, 23 },
+		{ 11, 0, 12, 24 },
+	};
 
+	if (key == -1) {
+		if (HAL_GPIO_ReadPin(COL1_GPIO_Port, COL1_Pin) == GPIO_PIN_RESET) key = keyboard[ROW][0];
+		if (HAL_GPIO_ReadPin(COL2_GPIO_Port, COL2_Pin) == GPIO_PIN_RESET) key = keyboard[ROW][1];
+		if (HAL_GPIO_ReadPin(COL3_GPIO_Port, COL3_Pin) == GPIO_PIN_RESET) key = keyboard[ROW][2];
+		if (HAL_GPIO_ReadPin(COL4_GPIO_Port, COL4_Pin) == GPIO_PIN_RESET) key = keyboard[ROW][3];
+	}
+
+	HAL_GPIO_WritePin(ROW1_GPIO_Port, ROW1_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(ROW2_GPIO_Port, ROW2_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(ROW3_GPIO_Port, ROW3_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(ROW4_GPIO_Port, ROW4_Pin, GPIO_PIN_SET);
+
+	switch (ROW) {
+		case 0: ROW = 1; HAL_GPIO_WritePin(ROW2_GPIO_Port, ROW2_Pin, GPIO_PIN_RESET); break;
+		case 1: ROW = 2; HAL_GPIO_WritePin(ROW3_GPIO_Port, ROW3_Pin, GPIO_PIN_RESET); break;
+		case 2: ROW = 3; HAL_GPIO_WritePin(ROW4_GPIO_Port, ROW4_Pin, GPIO_PIN_RESET); break;
+		case 3: ROW = 0; HAL_GPIO_WritePin(ROW1_GPIO_Port, ROW1_Pin, GPIO_PIN_RESET); break;
+	}
+
+}
 /* USER CODE END 4 */
 
 /**
